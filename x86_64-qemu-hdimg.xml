@@ -1,0 +1,123 @@
+<ns0:RootFileSystem
+    xmlns:ns0="https://www.linutronix.de/projects/Elbe"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    created="2024-01-01T00:00:00"
+    revision="6"
+    xsi:schemaLocation="https://www.linutronix.de/projects/Elbe dbsfed.xsd">
+
+  <project>
+    <name>x86_64-qemu-hdimg</name>
+    <version>1.0</version>
+    <description>Bootable disk image for QEMU, BIOS and UEFI</description>
+    <buildtype>amd64</buildtype>
+    <mirror>
+      <primary_host>deb.debian.org</primary_host>
+      <primary_path>/debian</primary_path>
+      <primary_proto>http</primary_proto>
+      <url-list>
+        <url>
+          <binary>http://deb.debian.org/debian-security bookworm-security main</binary>
+          <source>http://deb.debian.org/debian-security bookworm-security main</source>
+        </url>
+        <!-- Repo local com pacotes customizados, servido pelo container -->
+        <url>
+          <binary>[trusted=yes] http://10.0.2.2:8080/repo/0 ./</binary>
+          <source>[trusted=yes] http://10.0.2.2:8080/repo/0 ./</source>
+        </url>
+      </url-list>
+    </mirror>
+    <suite>bookworm</suite>
+  </project>
+
+  <target>
+    <hostname>elbe-qemu</hostname>
+    <domain>local</domain>
+    <passwd_hashed>$6$uJOcpedg.HRRj7RD$qLnVaFjCRG9FL2GaHLIl/P2UkQ8eH6XDSBeWItCLSNuGzIIWGEC7rxd1l4vZMa1U84yoQHalHNvdsfOicktIY0</passwd_hashed>
+    <console>ttyS0,115200</console>
+
+    <debootstrap>
+      <variant>minbase</variant>
+    </debootstrap>
+
+    <package>
+      <tar><name>rfs.tgz</name></tar>
+    </package>
+
+    <images>
+      <!-- GPT: suporta BIOS e UEFI -->
+      <gpthd>
+        <name>sda.img</name>
+        <size>2GiB</size>
+        <grub-install/>
+        <!-- Partição BIOS boot (para grub-pc) -->
+        <partition>
+          <size>1MiB</size>
+          <label>bios</label>
+          <biosgrub>true</biosgrub>
+        </partition>
+        <!-- EFI System Partition -->
+        <partition>
+          <size>100MiB</size>
+          <label>uefi</label>
+          <bootable>true</bootable>
+        </partition>
+        <!-- Root filesystem -->
+        <partition>
+          <size>remain</size>
+          <label>rfs</label>
+        </partition>
+      </gpthd>
+    </images>
+
+    <fstab>
+      <bylabel>
+        <label>rfs</label>
+        <mountpoint>/</mountpoint>
+        <fs>
+          <type>ext4</type>
+          <fs-finetuning>
+            <device-command>tune2fs -i 0 {device}</device-command>
+          </fs-finetuning>
+        </fs>
+      </bylabel>
+      <bylabel>
+        <label>uefi</label>
+        <mountpoint>/boot/efi</mountpoint>
+        <fs><type>vfat</type></fs>
+      </bylabel>
+    </fstab>
+
+    <install-recommends/>
+
+    <pkg-list>
+      <!-- grub-efi-amd64 conflita com grub-pc: usar -bin + grub-pc -->
+      <pkg>grub-efi-amd64-bin</pkg>
+      <pkg>grub-pc</pkg>
+      <pkg>linux-image-amd64</pkg>
+      <pkg>systemd</pkg>
+      <pkg>udev</pkg>
+      <pkg>dbus</pkg>
+      <pkg>bash</pkg>
+      <pkg>bash-completion</pkg>
+      <pkg>systemd-sysv</pkg>
+      <pkg>elbe-demo-pkg-hello</pkg>
+    </pkg-list>
+
+    <finetuning>
+      <!-- Configura GRUB para usar console serial (ttyS0) -->
+      <file dst="/etc/default/grub.d/serial.cfg">
+GRUB_TERMINAL="serial console"
+GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"
+GRUB_CMDLINE_LINUX_DEFAULT=""
+GRUB_CMDLINE_LINUX="console=ttyS0,115200n8"
+      </file>
+      <raw_cmd>update-grub</raw_cmd>
+      <!-- Getty na serial para TTY adequado (job control, tab completion) -->
+      <raw_cmd>systemctl enable serial-getty@ttyS0.service</raw_cmd>
+      <!-- DNS para QEMU user network -->
+      <file dst="/etc/resolv.conf">nameserver 10.0.2.3
+</file>
+    </finetuning>
+  </target>
+
+</ns0:RootFileSystem>

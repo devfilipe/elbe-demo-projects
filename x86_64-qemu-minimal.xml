@@ -1,0 +1,103 @@
+<ns0:RootFileSystem
+    xmlns:ns0="https://www.linutronix.de/projects/Elbe"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    created="2024-01-01T00:00:00"
+    revision="6"
+    xsi:schemaLocation="https://www.linutronix.de/projects/Elbe dbsfed.xsd">
+
+  <project>
+    <name>x86_64-qemu-minimal</name>
+    <version>1.0</version>
+    <description>Minimal Debian bootable image for QEMU (smallest footprint)</description>
+    <buildtype>amd64</buildtype>
+    <mirror>
+      <primary_host>deb.debian.org</primary_host>
+      <primary_path>/debian</primary_path>
+      <primary_proto>http</primary_proto>
+      <url-list>
+        <!-- Repo local com pacotes customizados -->
+        <url>
+          <binary>[trusted=yes] http://10.0.2.2:8080/repo/0 ./</binary>
+          <source>[trusted=yes] http://10.0.2.2:8080/repo/0 ./</source>
+        </url>
+      </url-list>
+    </mirror>
+    <suite>bookworm</suite>
+  </project>
+
+  <target>
+    <hostname>elbe-minimal</hostname>
+    <domain>local</domain>
+    <passwd_hashed>$6$uJOcpedg.HRRj7RD$qLnVaFjCRG9FL2GaHLIl/P2UkQ8eH6XDSBeWItCLSNuGzIIWGEC7rxd1l4vZMa1U84yoQHalHNvdsfOicktIY0</passwd_hashed>
+    <console>ttyS0,115200</console>
+
+    <debootstrap>
+      <variant>minbase</variant>
+    </debootstrap>
+
+    <package>
+      <tar><name>rfs.tgz</name></tar>
+    </package>
+
+    <images>
+      <gpthd>
+        <name>sda.img</name>
+        <size>1GiB</size>
+        <grub-install/>
+        <!-- BIOS boot partition (grub-pc) -->
+        <partition>
+          <size>1MiB</size>
+          <label>bios</label>
+          <biosgrub>true</biosgrub>
+        </partition>
+        <!-- Root filesystem -->
+        <partition>
+          <size>remain</size>
+          <label>rfs</label>
+        </partition>
+      </gpthd>
+    </images>
+
+    <fstab>
+      <bylabel>
+        <label>rfs</label>
+        <mountpoint>/</mountpoint>
+        <fs>
+          <type>ext4</type>
+          <fs-finetuning>
+            <device-command>tune2fs -i 0 {device}</device-command>
+          </fs-finetuning>
+        </fs>
+      </bylabel>
+    </fstab>
+
+    <pkg-list>
+      <!-- Boot mínimo: kernel + grub BIOS only (sem UEFI) -->
+      <pkg>linux-image-amd64</pkg>
+      <pkg>grub-pc</pkg>
+      <!-- Init mínimo -->
+      <pkg>systemd</pkg>
+      <pkg>systemd-sysv</pkg>
+      <pkg>udev</pkg>
+      <!-- Pacote customizado -->
+      <pkg>elbe-demo-pkg-hello</pkg>
+    </pkg-list>
+
+    <finetuning>
+      <!-- GRUB: serial-only console (sem VGA, mais leve) -->
+      <file dst="/etc/default/grub.d/serial.cfg">
+GRUB_TERMINAL="serial"
+GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+GRUB_CMDLINE_LINUX="console=ttyS0,115200n8"
+      </file>
+      <raw_cmd>update-grub</raw_cmd>
+      <!-- Getty na serial -->
+      <raw_cmd>systemctl enable serial-getty@ttyS0.service</raw_cmd>
+      <!-- DNS para QEMU user network -->
+      <file dst="/etc/resolv.conf">nameserver 10.0.2.3
+</file>
+    </finetuning>
+  </target>
+
+</ns0:RootFileSystem>

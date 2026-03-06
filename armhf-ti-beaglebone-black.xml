@@ -1,0 +1,139 @@
+<!--
+SPDX-License-Identifier: 0BSD
+SPDX-FileCopyrightText: Linutronix GmbH
+-->
+<ns0:RootFileSystem xmlns:ns0="https://www.linutronix.de/projects/Elbe" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" created="2009-05-20T08:50:56" revision="6" xsi:schemaLocation="https://www.linutronix.de/projects/Elbe dbsfed.xsd">
+	<project>
+		<!-- human readable description of the project -->
+		<name>beaglebone-black</name>
+		<version>1.0</version>
+		<description>
+			debian bookworm rootfs for beaglebone black
+		</description>
+		<!-- buildtype is used to configure qemu-user and debian arch -->
+		<buildtype>armhf</buildtype>
+		<mirror>
+			<!-- primary mirror is used by debootstrap -->
+			<primary_host>deb.debian.org</primary_host>
+			<primary_path>/debian</primary_path>
+			<primary_proto>http</primary_proto>
+			<url-list>
+				<url>
+					<binary>http://deb.debian.org/debian-security bookworm-security main</binary>
+					<source>http://deb.debian.org/debian-security bookworm-security main</source>
+				</url>
+			</url-list>
+		</mirror>
+
+		<!-- debian testing? stable? unstable?? -->
+		<suite>bookworm</suite>
+	</project>
+	<target>
+		<!-- content for /etc/hostname -->
+		<hostname>lxbbb</hostname>
+		<!-- content for /etc/domainname -->
+		<domain>linutronix.de</domain>
+		<!-- root password (hashed) -->
+		<passwd_hashed>$6$beaglebone$CQ8fkBxbeuxm370gBUKA2mCm.HMMbN27dP2xrUw5CxvjRFZozX7zPoJ/2kihkqeN.ELzt0Cs1HfSkB6FFZGye/</passwd_hashed>
+		<!-- run a getty here: -->
+		<console>ttyO0,115200</console>
+		<package>
+			<!-- build a tarball of the target image -->
+			<tar>
+				<name>bbb.tgz</name>
+			</tar>
+		</package>
+		<!-- define an sdcard image -->
+		<images>
+			<msdoshd>
+				<!-- name of the image file -->
+				<name>sdcard.img</name>
+				<size>1500MiB</size>
+				<!-- move boot files to the path where the bootloader expects them to be 
+				     see /usr/share/doc/u-boot-omap/README.Debian -->
+				<first_partition_sector>8192</first_partition_sector>
+				<binary offset="256" blocksize="512">/usr/lib/u-boot/am335x_boneblack/MLO</binary>
+				<binary offset="768" blocksize="512">/usr/lib/u-boot/am335x_boneblack/u-boot.img</binary>
+				<!-- partition layout -->
+				<partition>
+					<!-- This partition is only used for storing the env -->
+					<size>4MiB</size>
+					<!-- label needs to match with the fstab entry below -->
+					<label>u-boot</label>
+				</partition>
+				<partition>
+					<size>remain</size>
+					<label>rfs</label>
+					<bootable />
+				</partition>
+			</msdoshd>
+		</images>
+		<fstab>
+			<bylabel>
+				<!-- label needs to match with an image entry aboth -->
+				<label>rfs</label>
+				<mountpoint>/</mountpoint>
+				<fs>
+					<!-- fs type and options -->
+					<type>ext4</type>
+					<fs-finetuning>
+						<device-command>tune2fs -i 0 {device}</device-command>
+					</fs-finetuning>
+				</fs>
+			</bylabel>
+			<bylabel>
+				<label>u-boot</label>
+				<mountpoint>/boot/u-boot</mountpoint>
+				<fs>
+					<type>vfat</type>
+				</fs>
+			</bylabel>
+		</fstab>
+		<finetuning>
+			<file dst="/etc/systemd/network/20-eth.network">
+				[Match]
+				Name=eth0
+				[Network]
+				DHCP=ipv4
+			</file>
+			<command>systemctl enable systemd-networkd</command>
+			<file dst="/etc/default/u-boot">
+				U_BOOT_FDT="am335x-boneblack.dtb"
+				U_BOOT_ALTERNATIVES="default"
+				U_BOOT_TIMEOUT="1"
+				U_BOOT_PARAMETERS=" "
+			</file>
+			<command>u-boot-update</command>
+			<!-- shrink target image -->
+			<rm>/var/cache/apt/archives/*.deb</rm>
+			<rm>/var/cache/apt/*.bin</rm>
+			<rm>/var/lib/apt/lists/ftp*</rm>
+		</finetuning>
+		<!-- generate a pbuilder environment (before image will be built) -->
+		<pbuilder>
+			<src-pkg>zlib</src-pkg>
+			<src-pkg>minicoredumper</src-pkg>
+		</pbuilder>
+		<project-finetuning>
+			<losetup img="sdcard.img">
+				<extract_partition part="1">scard1.img</extract_partition>
+				<extract_partition part="2">scard2.img</extract_partition>
+			</losetup>
+		</project-finetuning>
+		<pkg-list>
+			<pkg>u-boot-omap</pkg>
+			<pkg>linux-image-armmp</pkg>
+			<pkg>openssh-server</pkg>
+			<pkg>less</pkg>
+			<pkg>bash</pkg>
+			<pkg>vim-tiny</pkg>
+			<pkg>wget</pkg>
+			<pkg>ntpdate</pkg>
+			<pkg>minicoredumper</pkg>
+			<pkg>busybox</pkg>
+			<pkg>systemd-resolved</pkg>
+			<pkg>u-boot-menu</pkg>
+			<pkg>zstd</pkg>
+		</pkg-list>
+	</target>
+</ns0:RootFileSystem>

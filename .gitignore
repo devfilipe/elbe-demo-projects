@@ -1,0 +1,4 @@
+# ELBE internal/temporary XML files generated during builds
+elbe-repodir-*.xml
+elbe-repo-*.xml
+source-*.xml
